@@ -38,3 +38,6 @@ src/.readwarning
 
 # Compiled Python
 *.pyc
+
+# IPython notebook checkpoints
+.ipynb_checkpoints/
