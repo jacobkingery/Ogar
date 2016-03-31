@@ -35,3 +35,6 @@ src/.settings/org.eclipse.wst.jsdt.ui.superType.name
 
 # Linux start script warning file
 src/.readwarning
+
+# No ipython notebook checkpoints
+**/.ipynb_checkpoints/
