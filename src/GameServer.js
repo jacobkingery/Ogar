@@ -35,6 +35,9 @@ function GameServer() {
     this.log = new Logger();
     this.commands; // Command handler
 
+    //For writing gamestate to a file
+    this.gameStateFile = fs.createWriteStream('gameState.json', {'flags': 'a'});
+
     // Main loop tick
     this.time = +new Date;
     this.startTime = this.time;
@@ -397,6 +400,28 @@ GameServer.prototype.mainLoop = function() {
     if (!this.run) return;
 
     if (this.tick >= 25) {
+        var nodesInfo = this.nodes.map(function(node){
+            var nodeInfo = {
+                nodeId: node.nodeId,
+                owner: node.owner,
+                color: node.color,
+                position: node.position,
+                mass: node.mass,
+                cellType: node.cellType,
+                spiked: node.spiked,
+                moveEngineTicks: node.moveEngineTicks,
+                moveEngineSpeed: node.moveEngineSpeed,
+                moveDecay: node.moveDecay,
+                angle: node.angle,
+                collisionRestoreTicks: node.collisionRestoreTicks,
+                size: node.size,
+                squareSize: node.squareSize,
+                shouldSendUpdate: node.shouldSendUpdate 
+            }
+            // return nodeInfo;
+            return nodeInfo
+        })
+        this.gameStateFile.write(JSON.stringify(nodesInfo) + '\n')
         this.fullTick++;
         setTimeout(this.moveTick.bind(this), 0);
 

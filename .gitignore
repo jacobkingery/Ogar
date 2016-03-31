@@ -41,3 +41,6 @@ src/.readwarning
 
 # IPython notebook checkpoints
 .ipynb_checkpoints/
+
+# JSON data files
+**/gameState.json
