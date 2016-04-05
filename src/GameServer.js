@@ -13,6 +13,12 @@ var Gamemode = require('./gamemodes');
 var BotLoader = require('./ai/BotLoader');
 var Logger = require('./modules/log');
 
+//For writing gamestate to a file
+
+const currentDateTime = new Date().getTime().toString();
+const gameStateFileName = 'gamestatelogs/gameState' + currentDateTime + '.json'
+var gameStateFile = fs.createWriteStream(gameStateFileName, {'flags': 'a'});
+
 // GameServer implementation
 function GameServer() {
     // Startup
@@ -34,9 +40,6 @@ function GameServer() {
     this.bots = new BotLoader(this);
     this.log = new Logger();
     this.commands; // Command handler
-
-    //For writing gamestate to a file
-    this.gameStateFile = fs.createWriteStream('gameState.json', {'flags': 'a'});
 
     // Main loop tick
     this.time = +new Date;
@@ -421,7 +424,7 @@ GameServer.prototype.mainLoop = function() {
             // return nodeInfo;
             return nodeInfo
         })
-        this.gameStateFile.write(JSON.stringify(nodesInfo) + '\n')
+        gameStateFile.write(JSON.stringify(nodesInfo) + '\n');
         this.fullTick++;
         setTimeout(this.moveTick.bind(this), 0);
 
