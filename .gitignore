@@ -43,4 +43,4 @@ src/.readwarning
 .ipynb_checkpoints/
 
 # JSON data files
-**/gameState.json
+**/gamestatelogs
