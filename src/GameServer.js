@@ -957,9 +957,10 @@ GameServer.prototype.updateCells = function() {
 };
 
 GameServer.prototype.loadConfig = function() {
+    var filename = process.argv[2] || './gameserver.ini';
     try {
         // Load the contents of the config file
-        var load = ini.parse(fs.readFileSync('./testgameserver.ini', 'utf-8'));
+        var load = ini.parse(fs.readFileSync(filename, 'utf-8'));
 
         // Replace all the default config's values with the loaded config's values
         for (var obj in load) {
