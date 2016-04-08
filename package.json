@@ -4,7 +4,8 @@
   "description": "Open source Agar.io server",
   "main": "src/index.js",
   "dependencies": {
-    "ws": "latest"
+    "ws": "latest",
+    "zerorpc": "^0.9.6"
   },
   "devDependencies": {},
   "scripts": {
