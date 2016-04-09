@@ -111,8 +111,9 @@ BotPlayer.prototype.update = function() { // Overrides the update function from 
     // //console.log(this)
 
     gameInfo = {
-        'cell': this.cells[0],
-        'nodes': this.visibleNodes.filter(function(node) {return node.owner !== that.cells[0].owner})
+        'cell': this.cells,
+        'nodes': this.visibleNodes.filter(function(node) {return node.owner !== that.cells[0].owner}),
+        'target': this.targetPos
     }
 
     var gameInfoString = JSON.stringify(gameInfo, function(key, value) {
