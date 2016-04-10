@@ -66,7 +66,7 @@ Commands.list = {
     },
     addbotpythonmulti: function(gameServer, split) {
         var add = parseInt(split[1]);
-        var respawn = !(split[2] === 'false')
+        var respawn = !(split[2] === 'false');
         if (isNaN(add)) {
             add = 1; // Adds 1 bot if user doesnt specify a number
         }
@@ -79,7 +79,7 @@ Commands.list = {
     addbotpythonsingle: function(gameServer, split) {
         var add = parseInt(split[1]);
         var port = parseInt(split[2]);
-        var respawn = !(split[3] === 'false')
+        var respawn = !(split[3] === 'false');
         if (isNaN(add)) {
             add = 1; // Adds 1 bot if user doesnt specify a number
         }
