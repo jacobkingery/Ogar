@@ -141,7 +141,7 @@ BotPlayer.prototype.update = function() { // Overrides the update function from 
                 return console.log(error)
             }
             // console.log(res.message)
-            // console.log(res.x + ", " + res.y)
+            console.log(res.x + ", " + res.y)
             this.mouse = {
                 x: res.x,
                 y: res.y

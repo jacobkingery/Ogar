@@ -6,61 +6,107 @@ import lspi
 import math
 import itertools
 
+class simpleBasis(lspi.basis_functions.BasisFunction):
+
+	def __init__(self, state_size, num_actions):
+		self.stateSize = state_size
+		self.__num_actions = lspi.basis_functions.BasisFunction._validate_num_actions(num_actions)
+
+	def size(self):
+		return self.stateSize
+
+	def evaluate(self, state, action):
+		return state
+
+	@property
+	def num_actions(self):
+		return self.__num_actions
+
+	@num_actions.setter
+	def num_actions(self, value):
+		if value < 1:
+			raise ValueError('num_actions must be at least 1.')
+		self.__num_actions = value
 
 class HelloRPC(object):
 	def __init__(self):
 		self.samples = []
+		self.lastNodeMass = 10
 		self.lastState = None
 		self.lastTargetAngle = None
-		self.numCellsInStateVector = 10
+		self.numCellsInStateVector = 1
 		self.lspiLearner = lspi.lspi
+		self.numiterations = 0
+		# self.policy = lspi.policy.Policy(
+		# 	lspi.basis_functions.RadialBasisFunction(
+		# 		[np.zeros((1,4*self.numCellsInStateVector))],
+		# 		1,
+		# 		360,
+		# 	),
+		# 	discount=0.9, 
+		# 	explore=0.4
+		# )
+		# self.policy = lspi.policy.Policy(
+		# 	lspi.basis_functions.FakeBasis(
+		# 		360,
+		# 	),
+		# 	discount=0.9, 
+		# 	explore=0.4
+		# )
 		self.policy = lspi.policy.Policy(
-			lspi.basis_functions.RadialBasisFunction(
-				[np.zeros((1,4*self.numCellsInStateVector))],
-				1,
+			simpleBasis(
+				self.numCellsInStateVector,
 				360,
 			),
 			discount=0.9, 
-			explore=0.4
+			explore=0.2
 		)
+
 
 	def getNewMousePosition(self, currentInfo):
 		currentInfo = json.loads(currentInfo)
+		self.numiterations += 1
+		print self.numiterations
 		if (self.lastState is not None):
-			print "getting new sample"
+
+			# print "state", self.lastState
+			# print "target angle", self.lastTargetAngle
+			# print "reward", self.getMassIncrease(currentInfo['cell'])
+
 			nextState = self.createStateFromInfo(currentInfo)
 			newSample = lspi.sample.Sample(
 				self.lastState,
 				self.lastTargetAngle,
-				self.getAverageNodeSize(currentInfo['cell']),
+				self.getMassIncrease(currentInfo['cell']),
 				nextState
 			)
 
 			self.samples.append(newSample)
-			print "learning"
 			# learn with the new samples!
-			self.lspiLearner.learn(
-				self.samples, 
+			self.policy = self.lspiLearner.learn(
+				[newSample], 
 				self.policy,
 				lspi.solvers.LSTDQSolver(
-					precondition_value=0.99
+					precondition_value=0.5
 				),
-				max_iterations=2
+				max_iterations=10
 
 			)
-			print "done"
 
 			newAction = self.policy.best_action(nextState)
 
 			targetX, targetY = self.getMousePosFromAngle(currentInfo['cell'], newAction)
 			self.lastState = nextState
 			self.lastTargetAngle = newAction
+			self.lastNodeMass = self.getCurrentMass(currentInfo['cell'])
+
 			return {'x': targetX, 'y': targetY, 'message':'placeholder'}
 			return {'x': 0, 'y': 0, 'message':'placeholder'}
 
 		else:
 			self.lastTargetAngle = 0
 			self.lastState = self.createStateFromInfo(currentInfo)
+			self.lastNodeMass = self.getCurrentMass(currentInfo['cell'])
 			lastState = currentInfo
 			targetX, targetY = self.getMousePosFromAngle(currentInfo['cell'], 0)
 			return {'x': targetX, 'y': targetY, 'message':'placeholder'}
@@ -95,37 +141,51 @@ class HelloRPC(object):
 		# We're including the 100 closest items to the bot. 
 		cellXPos, cellYPos = self.getCenterPos(currentInfo['cell'])
 		cellPos = np.array((cellXPos, cellYPos))
-		cellSize = self.getAverageNodeSize(currentInfo['cell'])
+		cellSize = self.getAverageNodeMass(currentInfo['cell'])
 		otherCellInfo = []
 
 		for otherCell in currentInfo['nodes']:
 			angle = int(math.degrees(math.atan((otherCell['position']['x'] - cellXPos)/(otherCell['position']['y'] - cellYPos))))
+			angle = (360 + angle) % 360
 			otherCellPos = np.array((otherCell['position']['x'],otherCell['position']['y']))
 			distance = np.linalg.norm(cellPos-otherCellPos)
 			sizeRatio = otherCell['mass']/cellSize
 			otherCellType = otherCell['cellType']
-			otherCellInfo.append((angle, distance, sizeRatio, otherCellType))
+			# otherCellInfo.append((angle, distance, sizeRatio, otherCellType))
+			otherCellInfo.append((angle))
 
-		topCells = sorted(otherCellInfo, key=lambda cell: cell[1])
 
+		# topCells = sorted(otherCellInfo, key=lambda cell: cell[1])
+		topCells = sorted(otherCellInfo)
 		stateCells = topCells[0:self.numCellsInStateVector]
-		if (len(stateCells) < self.numCellsInStateVector):
-			fakeCells = [(0, 1000000, 0, 0)] * (self.numCellsInStateVector-len(stateCells))
-			stateCells = stateCells + fakeCells
+		# if (len(stateCells) < self.numCellsInStateVector):
+		# 	fakeCells = [(0, 1000000, 0, 0)] * (self.numCellsInStateVector-len(stateCells))
+		# 	stateCells = stateCells + fakeCells
 
-		stateCells = np.array(list(itertools.chain(*stateCells)))
-		stateCells = stateCells.reshape(1,stateCells.shape[0])
-		print stateCells.shape
+		# stateCells = np.array(list(itertools.chain(*stateCells)))
+
+		stateCells = np.array(stateCells)
+		stateCells = stateCells.reshape(stateCells.shape[0],1)
 		return stateCells
 
-	def getAverageNodeSize(self, cell):
-		sizeList = []
+	def getAverageNodeMass(self, cell):
+		massList = []
 		for part in cell:
-			sizeList.append(part['mass'])
-		return sum(sizeList)/float(len(sizeList))
+			massList.append(part['mass'])
+		return sum(massList)/float(len(massList))
+
+	def getCurrentMass(self, cell):
+		massList = []
+		for part in cell:
+			massList.append(part['mass'])
+		return sum(massList)
+
+	def getMassIncrease(self, cell):
+		newMass = self.getCurrentMass(cell)
+		return (newMass - self.lastNodeMass)/self.lastNodeMass
 
 	def getMousePosFromAngle(self, cell, angle):
-		radius = 10
+		radius = 10000
 		
 		xPos, yPos = self.getCenterPos(cell)
 
