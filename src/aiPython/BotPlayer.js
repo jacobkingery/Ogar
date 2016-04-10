@@ -5,13 +5,14 @@ var child_process = require('child_process');
 var PlayerTracker = require('../PlayerTracker');
 var gameServer = require('../GameServer');
 
-function BotPlayer(currentGameServer, s, spawnPython, zerorpcPort) {
+function BotPlayer(currentGameServer, s, spawnPython, zerorpcPort, respawn) {
     PlayerTracker.apply(this, Array.prototype.slice.call(arguments));
     //this.color = gameServer.getRandomColor();
-
+    console.log(respawn)
     this.currentGameServer = currentGameServer;
     this.spawnPython = spawnPython;
-    this.zerorpcPort = zerorpcPort
+    this.zerorpcPort = zerorpcPort;
+    this.respawn = respawn;
     // AI only
     this.gameState = 0;
     this.path = [];
@@ -60,8 +61,23 @@ module.exports = BotPlayer;
 BotPlayer.prototype = new PlayerTracker();
 
 BotPlayer.prototype.update = function() { // Overrides the update function from player tracker
+    
+    // Respawn if bot is dead
+    if (this.cells.length <= 0 && this.respawn) {
+        console.log('trying to respawn')
+        this.gameServer.gameMode.onPlayerSpawn(this.gameServer, this);
+        if (this.cells.length == 0) {
+            console.log('respawn failed')
+            // If the bot cannot spawn any cells, then disconnect it
+            this.pythonLogic.kill();
+            this.socket.close();
+            return;
+        }
+    }
+
     //if cell is dead 
-    if (this.cells[0] == null){
+    if (this.cells[0] == null && !this.respawn){
+        console.log(this.respawn)
         if (this.spawnPython) {
             console.log('bot was eaten')
             this.pythonLogic.kill();
@@ -77,16 +93,6 @@ BotPlayer.prototype.update = function() { // Overrides the update function from 
             this.visibleNodes.splice(index, 1);
         }
     }
-
-    // // Respawn if bot is dead
-    // if (this.cells.length <= 0) {
-    //     this.gameServer.gameMode.onPlayerSpawn(this.gameServer, this);
-    //     if (this.cells.length == 0) {
-    //         // If the bot cannot spawn any cells, then disconnect it
-    //         this.socket.close();
-    //         return;
-    //     }
-    // }
 
     // Calculate nodes
     this.visibleNodes = this.calcViewBox();

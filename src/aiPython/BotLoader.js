@@ -46,9 +46,9 @@ BotLoader.prototype.loadNames = function() {
     this.nameIndex = 0;
 };
 
-BotLoader.prototype.addBotMulti = function() {
+BotLoader.prototype.addBotMulti = function(respawn) {
     var s = new FakeSocket(this.gameServer);
-    s.playerTracker = new BotPlayer(this.gameServer, s, true, this.nextPort);
+    s.playerTracker = new BotPlayer(this.gameServer, s, true, this.nextPort, respawn);
     this.botsMulti.push(s.playerTracker)
     this.nextPort++
     s.packetHandler = new PacketHandler(this.gameServer, s);
@@ -60,9 +60,9 @@ BotLoader.prototype.addBotMulti = function() {
     s.packetHandler.setNickname(this.getName());
 };
 
-BotLoader.prototype.addBotSingle = function(port) {
+BotLoader.prototype.addBotSingle = function(port, respawn) {
     var s = new FakeSocket(this.gameServer);
-    s.playerTracker = new BotPlayer(this.gameServer, s, false, port);
+    s.playerTracker = new BotPlayer(this.gameServer, s, false, port, respawn);
     this.botsSingle.push(s.playerTracker)
     this.nextPort++
     s.packetHandler = new PacketHandler(this.gameServer, s);
