@@ -2,32 +2,12 @@ import zerorpc
 import sys
 import numpy as np
 import json
-import lspi
 import math
 import itertools
 
-class simpleBasis(lspi.basis_functions.BasisFunction):
-
-	def __init__(self, state_size, num_actions):
-		self.stateSize = state_size
-		self.__num_actions = lspi.basis_functions.BasisFunction._validate_num_actions(num_actions)
-
-	def size(self):
-		return self.stateSize + 1
-
-	def evaluate(self, state, action):
-		phi = np.array([action, state[0], state[1]])
-		return phi
-
-	@property
-	def num_actions(self):
-		return self.__num_actions
-
-	@num_actions.setter
-	def num_actions(self, value):
-		if value < 1:
-			raise ValueError('num_actions must be at least 1.')
-		self.__num_actions = value
+import tensorflow as tf
+from tf_rl.models import MLP
+from tf_rl.controller import DiscreteDeepQ
 
 class HelloRPC(object):
 	def __init__(self):
@@ -36,66 +16,41 @@ class HelloRPC(object):
 		self.lastState = None
 		self.lastTargetAngle = None
 		self.numCellsInStateVector = 1
-		self.lspiLearner = lspi.lspi
+		
 		self.numiterations = 0
-		# self.policy = lspi.policy.Policy(
-		# 	lspi.basis_functions.RadialBasisFunction(
-		# 		[np.zeros((1,4*self.numCellsInStateVector))],
-		# 		1,
-		# 		360,
-		# 	),
-		# 	discount=0.9, 
-		# 	explore=0.4
-		# )
-		# self.policy = lspi.policy.Policy(
-		# 	lspi.basis_functions.FakeBasis(
-		# 		360,
-		# 	),
-		# 	discount=0.9, 
-		# 	explore=0.4
-		# )
-		self.policy = lspi.policy.Policy(
-			simpleBasis(
-				2*self.numCellsInStateVector,
-				360,
-			),
-			discount=0.5, 
-			explore=0.2
-		)
+
+		self.session = tf.InteractiveSession()
+		self.brain = MLP([4*self.numCellsInStateVector,],[200, 200, 360], [tf.tanh, tf.tanh, tf.identity])
+		self.optimizer = tf.train.RMSPropOptimizer(learning_rate= 0.001, decay=0.9)
+		# DiscreteDeepQ object
+		self.current_controller = DiscreteDeepQ(4*self.numCellsInStateVector, 360, self.brain,
+    		self.optimizer, self.session,
+            discount_rate=0.99, exploration_period=5000, 
+            max_experience=10000, store_every_nth=4, 
+            train_every_nth=4)
 
 
+		self.session.run(tf.initialize_all_variables())
+		self.session.run(self.current_controller.target_network_update)
 	def getNewMousePosition(self, currentInfo):
 		currentInfo = json.loads(currentInfo)
 		self.numiterations += 1
+		nextState = self.createStateFromInfo(currentInfo)
 		# print self.numiterations
 		if (self.lastState is not None):
+			
 
-			# print "state", self.lastState
-			# print "target angle", self.lastTargetAngle
-			# print "reward", self.getMassIncrease(currentInfo['cell'])
-
-			nextState = self.createStateFromInfo(currentInfo)
-			newSample = lspi.sample.Sample(
+			self.current_controller.store(
 				self.lastState,
 				self.lastTargetAngle,
 				self.getMassIncrease(currentInfo['cell']),
 				nextState
 			)
 
-			self.samples.append(newSample)
-			# learn with the new samples!
-			self.policy = self.lspiLearner.learn(
-				[newSample], 
-				self.policy,
-				lspi.solvers.LSTDQSolver(
-					precondition_value=0.5
-				),
-				max_iterations=10
+			newAction = self.current_controller.action(nextState)
 
-			)
-
-			newAction = self.policy.best_action(nextState)
-
+			self.current_controller.training_step()
+		
 			targetX, targetY = self.getMousePosFromAngle(currentInfo['cell'], newAction)
 			self.lastState = nextState
 			self.lastTargetAngle = newAction
@@ -153,8 +108,8 @@ class HelloRPC(object):
 				distance = np.linalg.norm(otherCellPos-cellPos)
 				sizeRatio = otherCell['mass']/cellSize
 				otherCellType = otherCell['cellType']
-				# otherCellInfo.append((angle, distance, sizeRatio, otherCellType))
-				otherCellInfo.append((angle, distance))
+				otherCellInfo.append((angle, distance, sizeRatio, otherCellType))
+				# otherCellInfo.append((angle, distance))
 
 				# otherCellInfo.append((angle))
 
@@ -169,8 +124,8 @@ class HelloRPC(object):
 
 		stateCells = np.array(list(itertools.chain(*stateCells)))
 
-		stateCells = np.array(stateCells)
-		stateCells = stateCells.reshape(stateCells.shape[0],1)
+		# stateCells = np.array(stateCells)
+		# stateCells = stateCells.reshape(stateCells.shape[0],1)
 		return stateCells
 
 	def getAverageNodeMass(self, cell):
