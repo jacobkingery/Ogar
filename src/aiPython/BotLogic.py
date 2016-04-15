@@ -6,111 +6,36 @@ import lspi
 import math
 import itertools
 
-class simpleBasis(lspi.basis_functions.BasisFunction):
-
-	def __init__(self, state_size, num_actions):
-		self.stateSize = state_size
-		self.__num_actions = lspi.basis_functions.BasisFunction._validate_num_actions(num_actions)
-
-	def size(self):
-		return self.stateSize + 1
-
-	def evaluate(self, state, action):
-		phi = np.array([action, state[0], state[1]])
-		return phi
-
-	@property
-	def num_actions(self):
-		return self.__num_actions
-
-	@num_actions.setter
-	def num_actions(self, value):
-		if value < 1:
-			raise ValueError('num_actions must be at least 1.')
-		self.__num_actions = value
+from pybrain.tools.shortcuts import buildNetwork
 
 class HelloRPC(object):
 	def __init__(self):
 		self.samples = []
-		self.lastNodeMass = 10
-		self.lastState = None
-		self.lastTargetAngle = None
+		self.previousMass = 10;
 		self.numCellsInStateVector = 1
-		self.lspiLearner = lspi.lspi
 		self.numiterations = 0
-		# self.policy = lspi.policy.Policy(
-		# 	lspi.basis_functions.RadialBasisFunction(
-		# 		[np.zeros((1,4*self.numCellsInStateVector))],
-		# 		1,
-		# 		360,
-		# 	),
-		# 	discount=0.9, 
-		# 	explore=0.4
-		# )
-		# self.policy = lspi.policy.Policy(
-		# 	lspi.basis_functions.FakeBasis(
-		# 		360,
-		# 	),
-		# 	discount=0.9, 
-		# 	explore=0.4
-		# )
-		self.policy = lspi.policy.Policy(
-			simpleBasis(
-				2*self.numCellsInStateVector,
-				360,
-			),
-			discount=0.5, 
-			explore=0.2
-		)
+		self.net = buildNetwork(2, 3, 1)
+
 
 
 	def getNewMousePosition(self, currentInfo):
 		currentInfo = json.loads(currentInfo)
+		currentState = self.createStateFromInfo(currentInfo)
 		self.numiterations += 1
-		# print self.numiterations
-		if (self.lastState is not None):
 
-			# print "state", self.lastState
-			# print "target angle", self.lastTargetAngle
-			# print "reward", self.getMassIncrease(currentInfo['cell'])
+		angle = 0
+		bestReward = -100000000;
+		for i in range(360):
+			reward = self.net.activate(i,currentState[:1])
+			if reward > bestReward:
+				angle = i
+				bestReward = reward
 
-			nextState = self.createStateFromInfo(currentInfo)
-			newSample = lspi.sample.Sample(
-				self.lastState,
-				self.lastTargetAngle,
-				self.getMassIncrease(currentInfo['cell']),
-				nextState
-			)
-
-			self.samples.append(newSample)
-			# learn with the new samples!
-			self.policy = self.lspiLearner.learn(
-				[newSample], 
-				self.policy,
-				lspi.solvers.LSTDQSolver(
-					precondition_value=0.5
-				),
-				max_iterations=10
-
-			)
-
-			newAction = self.policy.best_action(nextState)
-
-			targetX, targetY = self.getMousePosFromAngle(currentInfo['cell'], newAction)
-			self.lastState = nextState
-			self.lastTargetAngle = newAction
-			self.lastNodeMass = self.getCurrentMass(currentInfo['cell'])
-
-			return {'x': targetX, 'y': targetY, 'message':'Difference Between Target Angle and Food: ' + str(self.lastState[0] - self.lastTargetAngle) + ", distance between: " + str(self.lastState[1])}
-			# return {'x': 0, 'y': 0, 'message':'placeholder'}
-
-		else:
-			self.lastTargetAngle = 0
-			self.lastState = self.createStateFromInfo(currentInfo)
-			self.lastNodeMass = self.getCurrentMass(currentInfo['cell'])
-			lastState = currentInfo
-			targetX, targetY = self.getMousePosFromAngle(currentInfo['cell'], 0)
-			return {'x': targetX, 'y': targetY, 'message':'placeholder'}
+		angle = self.net.activate(currentState[:1])
+		targetX, targetY = self.getMousePosFromAngle(currentInfo['cell'], angle)
+		# print currentState
+		angleString = 'angle: '+ str(angle)
+		return {'x': targetX, 'y': targetY, 'message':angleString}
 
 
 		# closest = self.findClosest(currentInfo['cell'], currentInfo['nodes'])
@@ -167,11 +92,12 @@ class HelloRPC(object):
 			fakeCells = [(0, 1000000, 0, 0)] * (self.numCellsInStateVector-len(stateCells))
 			stateCells = stateCells + fakeCells
 
+		# print stateCells
 		stateCells = np.array(list(itertools.chain(*stateCells)))
-
-		stateCells = np.array(stateCells)
-		stateCells = stateCells.reshape(stateCells.shape[0],1)
 		return stateCells
+		# stateCells = np.array(stateCells)
+		# stateCells = stateCells.reshape(stateCells.shape[0],1)
+		# return stateCells
 
 	def getAverageNodeMass(self, cell):
 		massList = []
