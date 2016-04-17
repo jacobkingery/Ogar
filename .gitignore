@@ -37,3 +37,6 @@ src/.settings/org.eclipse.wst.jsdt.ui.superType.name
 src/.readwarning
 
 **/gamestatelogs
+
+# Pyc Files
+.pyc

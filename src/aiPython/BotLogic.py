@@ -4,6 +4,8 @@ import numpy as np
 import json
 import math
 import itertools
+import time
+import matplotlib.pyplot as plt
 
 import tensorflow as tf
 from tf_rl.models import MLP
@@ -20,22 +22,39 @@ class HelloRPC(object):
 		self.numiterations = 0
 
 		self.session = tf.InteractiveSession()
-		self.brain = MLP([4*self.numCellsInStateVector,],[200, 200, 360], [tf.tanh, tf.tanh, tf.identity])
+		self.brain = MLP([2*self.numCellsInStateVector,],[200, 200, 4], [tf.tanh, tf.tanh, tf.identity])
 		self.optimizer = tf.train.RMSPropOptimizer(learning_rate= 0.001, decay=0.9)
 		# DiscreteDeepQ object
-		self.current_controller = DiscreteDeepQ(4*self.numCellsInStateVector, 360, self.brain,
+		self.current_controller = DiscreteDeepQ(2*self.numCellsInStateVector, 4, self.brain,
     		self.optimizer, self.session,
             discount_rate=0.99, exploration_period=5000, 
-            max_experience=10000, store_every_nth=4, 
-            train_every_nth=4)
+            max_experience=10000, store_every_nth=1, 
+            train_every_nth=100)
 
 
 		self.session.run(tf.initialize_all_variables())
 		self.session.run(self.current_controller.target_network_update)
+
+		self.width = 600
+		self.height = 600
+		plt.ion()
+		self.fig = plt.figure()
+		self.ax = self.fig.add_subplot(111)
+		self.cell1, = self.ax.plot((300),(300),'o', color='black')
+
+		self.ax.set_xlim(0,600)
+		self.ax.set_ylim(0,600)
+
 	def getNewMousePosition(self, currentInfo):
+		tick = time.clock()
 		currentInfo = json.loads(currentInfo)
 		self.numiterations += 1
 		nextState = self.createStateFromInfo(currentInfo)
+
+		self.cell1.set_xdata((currentInfo['cell'][0]['position']['x']))
+		self.cell1.set_ydata((currentInfo['cell'][0]['position']['y']))
+		self.fig.canvas.draw()
+		plt.show()
 		# print self.numiterations
 		if (self.lastState is not None):
 			
@@ -51,20 +70,20 @@ class HelloRPC(object):
 
 			self.current_controller.training_step()
 		
-			targetX, targetY = self.getMousePosFromAngle(currentInfo['cell'], newAction)
+			targetX, targetY = self.getMousePosFromMove(currentInfo['cell'], newAction)
 			self.lastState = nextState
 			self.lastTargetAngle = newAction
 			self.lastNodeMass = self.getCurrentMass(currentInfo['cell'])
 
-			return {'x': targetX, 'y': targetY, 'message':'Difference Between Target Angle and Food: ' + str(self.lastState[0] - self.lastTargetAngle) + ", distance between: " + str(self.lastState[1])}
+			return {'x': targetX, 'y': targetY, 'message':'time to loop: ' + str(time.clock()-tick)}
 			# return {'x': 0, 'y': 0, 'message':'placeholder'}
 
 		else:
-			self.lastTargetAngle = 0
+			self.lastTargetAction = 0
 			self.lastState = self.createStateFromInfo(currentInfo)
 			self.lastNodeMass = self.getCurrentMass(currentInfo['cell'])
 			lastState = currentInfo
-			targetX, targetY = self.getMousePosFromAngle(currentInfo['cell'], 0)
+			targetX, targetY = self.getMousePosFromMove(currentInfo['cell'], 0)
 			return {'x': targetX, 'y': targetY, 'message':'placeholder'}
 
 
@@ -102,13 +121,15 @@ class HelloRPC(object):
 
 		for otherCell in currentInfo['nodes']:
 			if (otherCell['cellType'] == 1):
-				angle = int(math.degrees(math.atan2((otherCell['position']['y'] - cellYPos),(otherCell['position']['x'] - cellXPos))))
-				angle = (360 + angle) % 360
-				otherCellPos = np.array((otherCell['position']['x'],otherCell['position']['y']))
-				distance = np.linalg.norm(otherCellPos-cellPos)
+				distX = otherCell['position']['x'] - cellXPos
+				distY = otherCell['position']['y'] - cellYPos
+				# angle = int(math.degrees(math.atan2((otherCell['position']['y'] - cellYPos),(otherCell['position']['x'] - cellXPos))))
+				# angle = (360 + angle) % 360
+				# otherCellPos = np.array((otherCell['position']['x'],otherCell['position']['y']))
+				# distance = np.linalg.norm(otherCellPos-cellPos)
 				sizeRatio = otherCell['mass']/cellSize
 				otherCellType = otherCell['cellType']
-				otherCellInfo.append((angle, distance, sizeRatio, otherCellType))
+				otherCellInfo.append((float(distX)/self.width, float(distY)/self.height))
 				# otherCellInfo.append((angle, distance))
 
 				# otherCellInfo.append((angle))
@@ -119,7 +140,7 @@ class HelloRPC(object):
 		# topCells = sorted(otherCellInfo)
 		stateCells = topCells[0:self.numCellsInStateVector]
 		if (len(stateCells) < self.numCellsInStateVector):
-			fakeCells = [(0, 1000000, 0, 0)] * (self.numCellsInStateVector-len(stateCells))
+			fakeCells = [(1, 1)] * (self.numCellsInStateVector-len(stateCells))
 			stateCells = stateCells + fakeCells
 
 		stateCells = np.array(list(itertools.chain(*stateCells)))
@@ -144,13 +165,22 @@ class HelloRPC(object):
 		newMass = self.getCurrentMass(cell)
 		return (newMass - self.lastNodeMass)/self.lastNodeMass
 
-	def getMousePosFromAngle(self, cell, angle):
-		radius = 100
-		
-		xPos, yPos = self.getCenterPos(cell)
+	def getMousePosFromMove(self, cell, move):
+		radius = 10
 
-		newX = xPos + radius*(math.cos(math.radians(angle)))
-		newY = yPos + radius*(math.sin(math.radians(angle)))
+		xPos, yPos = self.getCenterPos(cell)
+		newX = xPos
+		newY = yPos
+
+
+		if (move == 0):
+			newX += radius
+		elif (move == 1):
+			newY += radius
+		elif (move == 2):
+			newX -= radius
+		else:
+			newY -= radius
 
 		return newX, newY
 
