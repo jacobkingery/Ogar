@@ -8,12 +8,13 @@ class HelloRPC(object):
 		pass
 
 	def getNewMousePosition(self, currentInfo):
+		return {'x':0,'y':0, 'message': 'no food in view'}
 		currentInfo = json.loads(currentInfo)
 		closest = self.findClosest(currentInfo['cell'], currentInfo['nodes'])
-		if closest:
-			return {'x': closest['position']['x'],'y': closest['position']['y'], 'message':closest}
-		else:
-			return {'x':0,'y':0, 'message': 'no food in view'}
+		# if closest:
+		# 	return {'x': closest['position']['x'],'y': closest['position']['y'], 'message':closest}
+		# else:
+		# 	return {'x':0,'y':0, 'message': 'no food in view'}
 
 	def findClosest(self, cell, otherNodes):
 		closestDist = 100000
